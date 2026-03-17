@@ -79,7 +79,9 @@ export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export const ANTHROPIC_MODEL =
-  process.env.ANTHROPIC_MODEL || envConfig.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+  process.env.ANTHROPIC_MODEL ||
+  envConfig.ANTHROPIC_MODEL ||
+  'claude-sonnet-4-6';
 
 // API configuration - passed to containers for upstream routing
 export const ANTHROPIC_API_KEY = envConfig.ANTHROPIC_API_KEY || '';

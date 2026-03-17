@@ -126,7 +126,9 @@ export class GmailChannel implements Channel {
     // If replying to main group, find the most recent thread ID
     if (threadId === 'main') {
       // Get the most recent message ID from the main group
-      const recentThreadId = Array.from(this.mainMessageToThread.values()).pop();
+      const recentThreadId = Array.from(
+        this.mainMessageToThread.values(),
+      ).pop();
       if (recentThreadId) {
         threadId = recentThreadId;
       }
@@ -135,7 +137,10 @@ export class GmailChannel implements Channel {
     const meta = this.threadMeta.get(threadId);
 
     if (!meta) {
-      logger.warn({ jid, threadId }, 'No thread metadata for reply, cannot send');
+      logger.warn(
+        { jid, threadId },
+        'No thread metadata for reply, cannot send',
+      );
       return;
     }
 
@@ -308,7 +313,13 @@ export class GmailChannel implements Channel {
     const mainJid = mainEntry[0];
 
     // Ensure main group chat entry exists before storing messages to it
-    this.opts.onChatMetadata(mainJid, timestamp, mainEntry[1].name, 'gmail', true);
+    this.opts.onChatMetadata(
+      mainJid,
+      timestamp,
+      mainEntry[1].name,
+      'gmail',
+      true,
+    );
 
     const content = `[Email from ${senderName} <${senderEmail}>]\nSubject: ${subject}\n\n${body}`;
 
