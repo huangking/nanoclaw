@@ -1,0 +1,69 @@
+name: Sync upstream -> PR (daily, rebase, auto-merge)
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream-pr
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/qwibitai/nanoclaw.git || true
+          git fetch upstream --prune
+          git fetch origin --prune
+
+      - name: Create sync branch from fork/main and rebase onto upstream/main
+        run: |
+          SYNC_BRANCH=sync/upstream-main
+          git checkout -B "$SYNC_BRANCH" origin/main
+          git rebase upstream/main
+
+      - name: Push sync branch to fork
+        run: |
+          SYNC_BRANCH=sync/upstream-main
+          git push origin "$SYNC_BRANCH" --force-with-lease
+
+      - name: Create or update PR, and enable auto-merge
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: sync/upstream-main
+          title: "chore: rebase sync from upstream (qwibitai/nanoclaw)"
+          body: |
+            Automated daily rebase sync PR.
+
+            - upstream: qwibitai/nanoclaw
+            - upstream branch: main
+            - strategy: rebase fork commits onto upstream/main
+
+            Notes:
+            - If rebase conflicts occur, this workflow will fail and you must resolve manually.
+          labels: |
+            upstream-sync
+          draft: false
+          delete-branch: false
+          auto-merge: true
+          merge-method: squash
