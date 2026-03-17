@@ -34,11 +34,56 @@ jobs:
           git fetch upstream --prune
           git fetch origin --prune
 
-      - name: Create sync branch from fork/main and rebase onto upstream/main
+      - name: Create sync branch and sync with upstream (prefer upstream workflows on conflict)
+        shell: bash
         run: |
+          set -euo pipefail
+
           SYNC_BRANCH=sync/upstream-main
+
+          # Start from fork main (keep fork-only commits)
           git checkout -B "$SYNC_BRANCH" origin/main
-          git rebase upstream/main
+
+          echo "Attempt rebase onto upstream/main..."
+          if git rebase upstream/main; then
+            echo "Rebase succeeded."
+            exit 0
+          fi
+
+          echo "Rebase failed; aborting rebase and falling back to merge."
+          git rebase --abort || true
+
+          echo "Merging upstream/main..."
+          # First try a normal merge (fast path)
+          if git merge --no-edit upstream/main; then
+            echo "Merge succeeded without conflicts."
+            exit 0
+          fi
+
+          echo "Merge has conflicts. Prefer upstream version for .github/workflows/**"
+          # For workflow conflict files, force upstream (theirs)
+          CONFLICTED_WORKFLOWS=$(git diff --name-only --diff-filter=U | grep '^\.github/workflows/' || true)
+
+          if [ -n "${CONFLICTED_WORKFLOWS}" ]; then
+            echo "Resolving workflow conflicts using upstream (theirs):"
+            echo "${CONFLICTED_WORKFLOWS}"
+
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              git checkout --theirs -- "$f" || true
+              git add -- "$f"
+            done <<< "${CONFLICTED_WORKFLOWS}"
+          fi
+
+          # If any conflicts remain (non-workflow), fail for manual resolution
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved conflicts remain (non-workflow files). Failing."
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+
+          git commit -m "chore: merge upstream/main (prefer upstream workflows on conflict)"
+          echo "Merge completed."
 
       - name: Push sync branch to fork
         run: |
@@ -51,16 +96,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           base: main
           branch: sync/upstream-main
-          title: "chore: rebase sync from upstream (qwibitai/nanoclaw)"
+          title: "chore: rebase/merge sync from upstream (qwibitai/nanoclaw)"
           body: |
-            Automated daily rebase sync PR.
+            Automated daily sync PR.
 
             - upstream: qwibitai/nanoclaw
             - upstream branch: main
-            - strategy: rebase fork commits onto upstream/main
+            - strategy: try rebase; if it conflicts, fall back to merge
+            - conflict rule: for .github/workflows/**, prefer upstream (theirs)
 
             Notes:
-            - If rebase conflicts occur, this workflow will fail and you must resolve manually.
+            - If non-workflow conflicts occur, this workflow will fail and you must resolve manually.
           labels: |
             upstream-sync
           draft: false
