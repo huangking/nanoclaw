@@ -16,6 +16,9 @@ vi.mock('./config.js', () => ({
   GROUPS_DIR: '/tmp/nanoclaw-test-groups',
   IDLE_TIMEOUT: 1800000, // 30min
   TIMEZONE: 'America/Los_Angeles',
+  ANTHROPIC_BASE_URL: 'https://test.example.com',
+  ANTHROPIC_API_KEY: 'test-api-key',
+  ANTHROPIC_MODEL: 'claude-sonnet-4-6',
 }));
 
 // Mock logger
