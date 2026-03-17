@@ -13,7 +13,12 @@ CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 echo "Building NanoClaw agent container image..."
 echo "Image: ${IMAGE_NAME}:${TAG}"
 
-${CONTAINER_RUNTIME} build -t "${IMAGE_NAME}:${TAG}" .
+${CONTAINER_RUNTIME} build \
+  --build-arg HTTP_PROXY=http://172.17.0.1:1087 \
+  --build-arg HTTPS_PROXY=http://172.17.0.1:1087 \
+  --build-arg http_proxy=http://172.17.0.1:1087 \
+  --build-arg https_proxy=http://172.17.0.1:1087 \
+  -t "${IMAGE_NAME}:${TAG}" .
 
 echo ""
 echo "Build complete!"

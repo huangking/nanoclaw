@@ -6,7 +6,13 @@ import { readEnvFile } from './env.js';
 // Read config values from .env (falls back to process.env).
 // Secrets (API keys, tokens) are NOT read here — they are loaded only
 // by the credential proxy (credential-proxy.ts), never exposed to containers.
-const envConfig = readEnvFile(['ASSISTANT_NAME', 'ASSISTANT_HAS_OWN_NUMBER']);
+const envConfig = readEnvFile([
+  'ASSISTANT_NAME',
+  'ASSISTANT_HAS_OWN_NUMBER',
+  'ANTHROPIC_MODEL',
+  'ANTHROPIC_API_KEY',
+  'ANTHROPIC_BASE_URL',
+]);
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
@@ -71,3 +77,12 @@ export const TRIGGER_PATTERN = new RegExp(
 // Uses system timezone by default
 export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export const ANTHROPIC_MODEL =
+  process.env.ANTHROPIC_MODEL ||
+  envConfig.ANTHROPIC_MODEL ||
+  'claude-sonnet-4-6';
+
+// API configuration - passed to containers for upstream routing
+export const ANTHROPIC_API_KEY = envConfig.ANTHROPIC_API_KEY || '';
+export const ANTHROPIC_BASE_URL = envConfig.ANTHROPIC_BASE_URL || '';
