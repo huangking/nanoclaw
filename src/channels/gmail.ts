@@ -40,6 +40,8 @@ export class GmailChannel implements Channel {
   private threadMeta = new Map<string, ThreadMeta>();
   private consecutiveErrors = 0;
   private userEmail = '';
+  // Map from main group message ID to thread ID for replies
+  private mainMessageToThread = new Map<string, string>();
 
   constructor(opts: GmailChannelOpts, pollIntervalMs = 60000) {
     this.opts = opts;
@@ -91,9 +93,13 @@ export class GmailChannel implements Channel {
 
     // Start polling with error backoff
     const schedulePoll = () => {
-      const backoffMs = this.consecutiveErrors > 0
-        ? Math.min(this.pollIntervalMs * Math.pow(2, this.consecutiveErrors), 30 * 60 * 1000)
-        : this.pollIntervalMs;
+      const backoffMs =
+        this.consecutiveErrors > 0
+          ? Math.min(
+              this.pollIntervalMs * Math.pow(2, this.consecutiveErrors),
+              30 * 60 * 1000,
+            )
+          : this.pollIntervalMs;
       this.pollTimer = setTimeout(() => {
         this.pollForMessages()
           .catch((err) => logger.error({ err }, 'Gmail poll error'))
@@ -114,11 +120,22 @@ export class GmailChannel implements Channel {
       return;
     }
 
-    const threadId = jid.replace(/^gmail:/, '');
+    // Extract thread ID from JID (gmail:{threadId} or gmail:main)
+    let threadId = jid.replace(/^gmail:/, '');
+
+    // If replying to main group, find the most recent thread ID
+    if (threadId === 'main') {
+      // Get the most recent message ID from the main group
+      const recentThreadId = Array.from(this.mainMessageToThread.values()).pop();
+      if (recentThreadId) {
+        threadId = recentThreadId;
+      }
+    }
+
     const meta = this.threadMeta.get(threadId);
 
     if (!meta) {
-      logger.warn({ jid }, 'No thread metadata for reply, cannot send');
+      logger.warn({ jid, threadId }, 'No thread metadata for reply, cannot send');
       return;
     }
 
@@ -210,8 +227,18 @@ export class GmailChannel implements Channel {
       this.consecutiveErrors = 0;
     } catch (err) {
       this.consecutiveErrors++;
-      const backoffMs = Math.min(this.pollIntervalMs * Math.pow(2, this.consecutiveErrors), 30 * 60 * 1000);
-      logger.error({ err, consecutiveErrors: this.consecutiveErrors, nextPollMs: backoffMs }, 'Gmail poll failed');
+      const backoffMs = Math.min(
+        this.pollIntervalMs * Math.pow(2, this.consecutiveErrors),
+        30 * 60 * 1000,
+      );
+      logger.error(
+        {
+          err,
+          consecutiveErrors: this.consecutiveErrors,
+          nextPollMs: backoffMs,
+        },
+        'Gmail poll failed',
+      );
     }
   }
 
@@ -268,9 +295,7 @@ export class GmailChannel implements Channel {
 
     // Find the main group to deliver the email notification
     const groups = this.opts.registeredGroups();
-    const mainEntry = Object.entries(groups).find(
-      ([, g]) => g.isMain === true,
-    );
+    const mainEntry = Object.entries(groups).find(([, g]) => g.isMain === true);
 
     if (!mainEntry) {
       logger.debug(
@@ -281,6 +306,10 @@ export class GmailChannel implements Channel {
     }
 
     const mainJid = mainEntry[0];
+
+    // Ensure main group chat entry exists before storing messages to it
+    this.opts.onChatMetadata(mainJid, timestamp, mainEntry[1].name, 'gmail', true);
+
     const content = `[Email from ${senderName} <${senderEmail}>]\nSubject: ${subject}\n\n${body}`;
 
     this.opts.onMessage(mainJid, {
@@ -292,6 +321,9 @@ export class GmailChannel implements Channel {
       timestamp,
       is_from_me: false,
     });
+
+    // Store mapping from main group message ID to thread ID for replies
+    this.mainMessageToThread.set(messageId, threadId);
 
     // Mark as read
     try {

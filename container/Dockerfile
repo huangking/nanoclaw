@@ -3,6 +3,10 @@
 
 FROM node:22-slim
 
+# Use Aliyun mirror for Debian bookworm
+RUN sed -i 's/deb\.debian\.org/mirrors\.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb\.debian\.org/mirrors\.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+
 # Install system dependencies for Chromium
 RUN apt-get update && apt-get install -y \
     chromium \
