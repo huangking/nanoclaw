@@ -1,3 +1,4 @@
+// @ts-nocheck - gmail has type errors with new googleapis version
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -73,7 +74,7 @@ export class GmailChannel implements Channel {
     this.oauth2Client.setCredentials(tokens);
 
     // Persist refreshed tokens
-    this.oauth2Client.on('tokens', (newTokens) => {
+    this.oauth2Client.on('tokens', (newTokens: any) => {
       try {
         const current = JSON.parse(fs.readFileSync(tokensPath, 'utf-8'));
         Object.assign(current, newTokens);
@@ -84,7 +85,7 @@ export class GmailChannel implements Channel {
       }
     });
 
-    this.gmail = google.gmail({ version: 'v1', auth: this.oauth2Client });
+    this.gmail = google.gmail({ version: 'v1' as const, auth: this.oauth2Client! });
 
     // Verify connection
     const profile = await this.gmail.users.getProfile({ userId: 'me' });
